@@ -2,6 +2,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cstdint>
+#include <bit>
 
 #include "graphs.hpp"
 
@@ -27,7 +28,10 @@ inline constexpr float l2f(unsigned long x) {
 inline constexpr float epsilon() {
     return l2f(f2l(1) + 1) - 1;
 }
-inline constexpr float fexp(float x) {
+inline float fexp(float x) {
+    uint32_t magic = 1/epsilon() + 0x38aa22;
+    uint32_t magic_1 = f2l(1);
+    std::cout << std::hex << "magic: " << magic << ", magic_1: " << magic_1 << std::endl;
     return l2f(static_cast<unsigned long>(x * (1/epsilon() + 0x38aa22)) + f2l(1));
 }
 
@@ -65,19 +69,95 @@ float refine_gaussian_v2(float x, float initial_guess) {
 
 
 float fast_gaussian(float x) {
-    union FloatInt u;
+    float magic = -6051101.5f; // (1 << 23) * 0.5 * log2(e) * -1
+    float integer_1 = 0x3f800000; // 1.0f, converted to a float
+    uint32_t i = (uint32_t)(magic * x * x + integer_1);
 
-    uint32_t exp = (uint32_t)(-6051101.5f * x * x); // (1 << 23) * 0.5 * log2(e)
-    u.i = (127 << 23) + exp;
-    float y = u.f;
-
-    return y;
+    return std::bit_cast<float>(i);
 }
 
 float fast_gaussian_v2(float x) {
     return hack::fexp(-0.5f * x * x);
 }
 
+float fast_gaussian_v3(float x) {
+    // not correct
+    // This computes exp(x^2), but we want exp(-x^2/2)
+    const uint32_t sq_magic = 0xc085c000;
+    const uint32_t exp_magic = 0xb8aa22;
+    const uint32_t magic_1 = 0x3f800000; // std::bit_cast<uint32_t>(1.0f);
+    // value is (sq_magic + 2*x) * exp_magic + magic_1
+    const uint32_t magic_offset = sq_magic * exp_magic + magic_1;
+    const uint32_t magic_factor = 2 * exp_magic;
+
+    uint32_t i = std::bit_cast<uint32_t>(x);
+    i = magic_factor * i + magic_offset;
+    //i = (sq_magic + 2*i) * exp_magic + magic_1;
+    float y = std::bit_cast<float>(i);
+    return y;
+}
+
+float fast_gaussian_v4(float x) {
+    // computes -x^2/2
+    const uint32_t sq_magic = 0x4005c000;
+    const uint32_t exp_magic = 0xb8aa22;
+    const uint32_t magic_1 = 0x3f800000; // std::bit_cast<uint32_t>(1.0f);
+    // value is (sq_magic + 2*x) * exp_magic + magic_1
+    const uint32_t magic_offset = sq_magic * exp_magic + magic_1;
+    const uint32_t magic_factor = 2 * exp_magic;
+
+    uint32_t i = std::bit_cast<uint32_t>(x);
+    i = (sq_magic + 2 * i);
+    float y = std::bit_cast<float>(i);
+    y = std::bit_cast<float>(std::bit_cast<uint32_t>(y * exp_magic) + magic_1);
+    return y;
+    //return hack::fexp(y);
+}
+
+float evil_square(float x) {
+
+    // const uint32_t magic = -1u * (std::bit_cast<uint32_t>(1.0f) - 0x5c000);
+    const uint32_t magic = 0xc085c000;
+    std::cout << std::hex << magic << std::endl;
+
+    uint32_t i = std::bit_cast<uint32_t>(x);
+    // // Evil floating point bit hack
+    // i += 0xFF800000;
+    i  = magic + 2 * i;
+    float y = std::bit_cast<float>(i);
+
+    return 2 * x * std::sqrt(y) - y;
+}
+
+float evil_half_negative_square(float x) {
+    // compute -x^2 / 2
+    const uint32_t magic = -1u * (std::bit_cast<uint32_t>(-2.0f) - 0x5c000);
+    //const uint32_t magic = 0xc085c000;
+    std::cout << std::hex << magic << std::endl;
+
+    uint32_t i = std::bit_cast<uint32_t>(x);
+    // // Evil floating point bit hack
+    // i += 0xFF800000;
+    i  = magic + 2 * i;
+    float y = std::bit_cast<float>(i);
+
+    return y;
+}
+
+void test_square() {
+ // calculation should be be of the form (magic + 2*x)
+ // magic = (1-m) * (1 + bias) for x^m (m=2)
+ // bias = -0x5c000
+    for (float x = 0.0f; x <= 30.0f; x+= 3.14159f) {
+        float true_square = (x * x) / -2.0f;
+        float evil_sq = evil_half_negative_square(x);
+
+        std::cout << std::setprecision(15)
+            << "x: " << x << ", func: " << true_square
+            << ", evil: " << evil_sq
+            << ", error: " << true_square - evil_sq << std:: endl;
+    }
+}
 
 void test_gaussian() {
     int n_tests = 10;
@@ -109,17 +189,19 @@ int main()
 
 	double xmin = -3;
 	double xmax = 3;
-	double ymin = 0;
+	double ymin = -1.0;
 	double ymax = 1.0;
     
     const auto tg = [](auto x) { return std::exp(-x * x / 2.0f); };
     const auto fg = [](auto x) { return fast_gaussian(x); };
     const auto fg2 = [](auto x) { return fast_gaussian_v2(x); };
-	std::function<float(float)> functions[] = {tg, fg, fg2};
+	std::function<float(float)> functions[] = {tg, fg};
 
-	graphs::functions(height, width, xmin, xmax, ymin, ymax, 3, functions);
+	graphs::functions(height, width, xmin, xmax, ymin, ymax, 2, functions);
 
     test_gaussian();
+
+    //test_square();
 	return 0;
 }
 
