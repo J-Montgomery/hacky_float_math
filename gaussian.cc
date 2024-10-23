@@ -29,9 +29,6 @@ inline constexpr float epsilon() {
     return l2f(f2l(1) + 1) - 1;
 }
 inline float fexp(float x) {
-    uint32_t magic = 1/epsilon() + 0x38aa22;
-    uint32_t magic_1 = f2l(1);
-    std::cout << std::hex << "magic: " << magic << ", magic_1: " << magic_1 << std::endl;
     return l2f(static_cast<unsigned long>(x * (1/epsilon() + 0x38aa22)) + f2l(1));
 }
 
@@ -69,12 +66,14 @@ float refine_gaussian_v2(float x, float initial_guess) {
 
 
 float fast_gaussian(float x) {
+    // the constant -6052212.5f seems to get better average
+    // error, but the error increases in the worst cases
+    // Both are close to the value of the formula below
     float magic = -6051101.5f; // (1 << 23) * 0.5 * log2(e) * -1
     float integer_1 = 0x3f800000; // 1.0f, converted to a float
-    uint32_t i = (uint32_t)(magic * x * x + integer_1);
-
-    return std::bit_cast<float>(i);
+    return std::bit_cast<float>((uint32_t)(magic * x * x + integer_1));
 }
+
 
 float fast_gaussian_v2(float x) {
     return hack::fexp(-0.5f * x * x);
