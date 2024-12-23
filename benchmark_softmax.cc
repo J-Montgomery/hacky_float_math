@@ -18,8 +18,8 @@ namespace fast {
 
     float exp(float x) {
         //float magic = 214760456192.0f; // more accurate for large values, loses significant precision for small values
-        float magic = 12102203.2f; // approx. (2^23) * log2(e)
-        float integer_1 = 0x3f800000; // 1.0f, converted to a float
+        float magic = 12101628.0f; // approx. (2^23) * log2(e)
+        float integer_1 = 0x7f800000; // 1.0f, converted to a float (1.0 * (255 * 2^23))
         return std::bit_cast<float>((int32_t)(std::fma(magic, x, integer_1)));
     }
 

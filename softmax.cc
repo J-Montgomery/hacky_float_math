@@ -9,8 +9,6 @@
 
 #include "graphs.hpp"
 
-#include <benchmark/benchmark.h>
-
 #include <immintrin.h>
 
 namespace fast {
@@ -20,7 +18,7 @@ namespace fast {
 
         //float magic = 214760456192.0f; // more accurate for large values, loses significant precision for small values
         float magic = 12102203.2f; // approx. (2^23) * log2(e)
-        float integer_1 = 0x3f800000; // 1.0f, converted to a float
+        float integer_1 = 0x3F7A8480; // 1.0f, converted to a float
         return std::bit_cast<float>((int32_t)(std::fma(magic, x, integer_1)));
     }
 
@@ -95,6 +93,10 @@ namespace fast {
     }
 }
 
+#if defined(__clang__)
+#pragma clang attribute pop
+#endif
+
 float softmax(std::vector<float>& input) {
     auto max_val = *std::max_element(input.begin(), input.end());
     float sum = 0.0f;
@@ -115,7 +117,7 @@ float softmax(std::vector<float>& input) {
 
 void test_exp() {
 
-    for (float x = -70.0f; x <= 70.0f; x+= 1.0f) {
+    for (float x = -110.0f; x <= 90.0f; x+= 1.0f) {
         float true_value = std::exp(x);
         float approx_value = fast::exp(x);
         float error = std::fabs(true_value - approx_value)/true_value;
@@ -184,7 +186,7 @@ int main() {
 	std::function<float(float)> functions[] = {te, fe};
     graphs::functions(height, width, xmin, xmax, ymin, ymax, 2, functions);
     
-    //test_exp();
+    test_exp();
     //test_log();
     test_softmax();
     return 0;
