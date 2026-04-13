@@ -26,6 +26,7 @@ static float integer_1 = 1064782016; // 1.0f, converted to a float
 static uint32_t magic_mask = 0x7eb504f3;
 static float magic_number = 1.38535642623901;
 static float approx_magic_number = 1.48927379686;
+static float scalar = 1.0f;
 
 // float evil_inverse(float b) {
 //     // We want exp2(-log2(b))
@@ -102,9 +103,10 @@ float reciprocal_1_f (float x){
 
 uint8_t magic_divide(uint8_t a, uint8_t b) {
     float x = static_cast<float>(b);
-    int i = 0x7eb504f3 - *reinterpret_cast<int*>(&x);
-    float reciprocal = std::bit_cast<float>(i);
-    return a*1.94285123f*reciprocal*(-x*reciprocal+1.43566f);
+    //int i = 0x7eb504f3 - *reinterpret_cast<int*>(&x);
+    float y = x * scalar;
+    float inverse = y * (2 - y*x);
+    return a*inverse;
 }
 
 
@@ -124,7 +126,7 @@ size_t test_u8_divide() {
         const float result = correct_int_divide(a, b);
         const float fast_result = magic_divide(a, b);
         if(result != fast_result) {
-            std::cout << std::setfill('0') << std::setw(2) << static_cast<int>(a) << " / " << std::setw(2) << static_cast<int>(b) << " != " << std::setw(2) << static_cast<int>(result) << " " << std::setw(2) << static_cast<int>(fast_result) << "\n";
+            //std::cout << std::setfill('0') << std::setw(2) << static_cast<int>(a) << " / " << std::setw(2) << static_cast<int>(b) << " != " << std::setw(2) << static_cast<int>(result) << " " << std::setw(2) << static_cast<int>(fast_result) << "\n";
             num_failed++;
         }
     }
@@ -150,21 +152,21 @@ int main()
     size_t iterations = 0;
     size_t failures = 0;
     size_t min = 256*256;
-    // while((failures = test_u8_divide()) > 0) {
-    //     if(!(iterations % 1000)) {
-    //         std::cout << "Trying " << std::setprecision(15) << std::hex <<approx_magic_number << std::dec << "\n";
-    //         std::cout << "Failures: " << failures << "\n";
-    //         std::cout << "Min: " << min << "\n";
-    //     }
+    while((failures = test_u8_divide()) > 0) {
+        if(!(iterations % 1000)) {
+            std::cout << "Trying " << std::setprecision(15) << std::hex <<scalar << std::dec << "\n";
+            std::cout << "Failures: " << failures << "\n";
+            std::cout << "Min: " << min << "\n";
+        }
 
-    //     // if(failures < min) {
-    //     //     std::cout << "New min: " << std::setprecision(15) << magic_mask << " Failures: " << failures << std::dec << "\n";
-    //     //     min = failures;
-    //     // }
-    //     iterations++;
-    //     //magic_mask -= 1;
-    //     approx_magic_number = std::nextafter(approx_magic_number, -std::numeric_limits<float>::infinity());
-    // }
+        // if(failures < min) {
+        //     std::cout << "New min: " << std::setprecision(15) << magic_mask << " Failures: " << failures << std::dec << "\n";
+        //     min = failures;
+        // }
+        iterations++;
+        scalar += 0.01f;
+        //approx_magic_number = std::nextafter(approx_magic_number, -std::numeric_limits<float>::infinity());
+    }
     std::cout << "Failures: " << test_u8_divide() << " with magic_scale2: " << std::setprecision(15) << magic_scale2 << "\n";
 	return 0;
 }
