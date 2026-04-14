@@ -34,6 +34,34 @@ namespace fast {
         return magic_scale * (float)(i - offset);
     }
 
+        float approx_log2_interpolated_2bit(float x) {
+            uint32_t i = std::bit_cast<uint32_t>(x);
+
+            int32_t exponent = static_cast<int32_t>((i >> 23) & 0xFF) - 127;
+            
+            uint32_t mantissa_bits = (i & 0x007FFFFF) | 0x3F800000;
+            float m = std::bit_cast<float>(mantissa_bits);
+
+            // 3. 2-bit Table (2^2 = 4 entries + 1 for boundary)
+            // table[i] = log2(1 + i/4)
+            static constexpr float table[5] = {
+                0.00000000f, // log2(1.00)
+                0.32192809f, // log2(1.25)
+                0.58496250f, // log2(1.50)
+                0.80735492f, // log2(1.75)
+                1.00000000f  // log2(2.00) - for easy interpolation
+            };
+
+            float f = m - 1.0f;
+            float scaled_f = f * 4.0f;
+            int index = static_cast<int>(scaled_f);
+            float fraction = scaled_f - static_cast<float>(index);
+
+            float log2_mantissa = table[index] + fraction * (table[index + 1] - table[index]);
+
+            return static_cast<float>(exponent) + log2_mantissa;
+        }
+
     float softmax(std::vector<float>& input) {
         auto max_val = *std::max_element(input.begin(), input.end());
         float sum = 0.0f;
