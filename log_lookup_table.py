@@ -160,11 +160,18 @@ def build_exp2_table(bits=4):
     table = 2**f_values
     return table
 
+def build_exp_lut_interpolated(bits=4):
+    n_entries = 1 << bits
+    f_values = np.linspace(1, 2, n_entries + 1)
+    
+    table = 2**f_values
+    slopes = np.diff(table)
+    
+    return table, slopes
+
 def approx_exp2(x, table, bits=4):
     """
-    Approximates 2^x using the lookup table.
-    x = I + f
-    2^x = 2^I * 2^f
+    2^x = 2^(I + f) = 2^I * 2^f
     """
     i = np.floor(x).astype(int)
     f = x - i
@@ -173,13 +180,30 @@ def approx_exp2(x, table, bits=4):
     index = (f * n_entries).astype(int)
     index = np.clip(index, 0, n_entries - 1)
     
-    return (2.0**i) * table[index]
+    mantissa_part = table[index]
+    return np.ldexp(mantissa_part, i)
 
+def approx_exp2_interpolated_2bit(x):    
+    exponent = np.floor(x).astype(int)
+    fractional_part = x - exponent
+    table = np.array([1.0, 1.1892, 1.4142, 1.6818, 2.0], dtype=np.float32)
+
+    scaled_f = fractional_part * 4.0
+    idx = np.clip(np.floor(scaled_f).astype(int), 0, 3)
+    frac = scaled_f - idx
+    
+    y0 = table[idx]
+    y1 = table[idx + 1]
+    
+    exp2_f = y0 + frac * (y1 - y0)
+
+    return np.ldexp(exp2_f, exponent)
 
 table_exp = build_exp2_table(bits)
 x_vals_exp = np.linspace(-2, 3, 1000)
 y_true_exp = 2**x_vals_exp
 y_approx_exp = approx_exp2(x_vals_exp, table_exp, bits)
+# y_approx_exp = approx_exp2_interpolated_2bit(x_vals_exp)
 
 plt.figure(figsize=(10, 6))
 plt.plot(x_vals_exp, y_true_exp, label='Exact $2^x$', color='blue', alpha=0.5)
